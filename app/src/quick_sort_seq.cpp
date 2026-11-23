@@ -1,11 +1,9 @@
 #include "quick_sort_seq.h"
 
-#include <cstdint>
-#include <utility>
+#include <limits>
 
-std::vector<int> quick_sort_seq(std::vector<int>& a) {
+void quick_sort_seq(std::vector<int>& a) {
     quick_sort_seq(a, 0, a.size());
-    return a;
 }
 
 static int partition(std::vector<int>& a, int l, int r, int pivot) {
@@ -30,10 +28,12 @@ void quick_sort_seq(std::vector<int>& a, int l, int r) {
         return;
     }
 
-    int pivot = a[l + (r - l - 1) / 2];
+    int pivot = a[(r + l) / 2];
 
     int equal_begin = partition(a, l, r, pivot);
-    int greater_begin = partition(a, equal_begin, r, pivot + 1);
+    int greater_begin = pivot == std::numeric_limits<int>::max()
+        ? r
+        : partition(a, equal_begin, r, pivot + 1);
     quick_sort_seq(a, l, equal_begin);
     quick_sort_seq(a, greater_begin, r);
 }

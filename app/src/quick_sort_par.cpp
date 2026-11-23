@@ -1,9 +1,8 @@
 #include "quick_sort_par.h"
-
-#include <parlay/parallel.h>
-
 #include "quick_sort_seq.h"
 #include "primitives.h"
+
+#include <parlay/parallel.h>
 
 BlockInfo count_block_info(std::vector<int>&a, int l, int r, int pivot) {
     BlockInfo info;
@@ -14,64 +13,60 @@ BlockInfo count_block_info(std::vector<int>&a, int l, int r, int pivot) {
     return info;
 }
 
-BlockInfo partition_blocks(std::vector<int>& a, std::vector<BlockInfo>& tmp, std::vector<int>& buff, int l, int r, int pivot) {
+void write_block(
+    std::vector<int>&a, 
+    std::vector<int>&buff, 
+    int l, 
+    int r, 
+    int pivot, 
+    BlockInfo&info, 
+    BlockInfo& total, 
+    int block_id
+) {
+    int s = l + block_id * MIN_SEGMENT_SIZE;
+    int t = std::min(s + MIN_SEGMENT_SIZE, r);
+    
+    int less = l + info.less;
+    int equals = l + total.less + info.equal;
+    int greater = l + total.less + total.equal + (block_id * MIN_SEGMENT_SIZE - info.less - info.equal);
+    for (int i = s; i < t; i++) {
+        if (a[i] == pivot) {
+            buff[equals++] = a[i];
+        } else if (a[i] < pivot) {
+            buff[less++] = a[i];
+        } else {
+            buff[greater++] = a[i];
+        }
+    }
+}
+
+BlockInfo partition_blocks(
+    std::vector<int>& a, 
+    std::vector<BlockInfo>& tmp, 
+    std::vector<int>& buff, 
+    int l, 
+    int r, 
+    int pivot
+) {
     int blocks = (r - l) / MIN_SEGMENT_SIZE;
-    int tail_begin = l + blocks * MIN_SEGMENT_SIZE;
     int tmp_begin = l / MIN_SEGMENT_SIZE;
 
     pfor(0, blocks, [&](int i) {
-        int begin = l + i * MIN_SEGMENT_SIZE;
-        int end = begin + MIN_SEGMENT_SIZE;
-        tmp[tmp_begin + i] = count_block_info(a, begin, end, pivot);
+        tmp[tmp_begin + i] = count_block_info(a, l + i * MIN_SEGMENT_SIZE, l + (i+1) * MIN_SEGMENT_SIZE, pivot);
     });
 
-    BlockInfo full_total = scan(tmp, tmp_begin, tmp_begin + blocks);
-    BlockInfo total = full_total + count_block_info(a, tail_begin, r, pivot);
-    int equal_begin = l + total.less;
-    int greater_begin = equal_begin + total.equal;
+    BlockInfo blocks_res = scan(tmp, tmp_begin, tmp_begin + blocks);
+    BlockInfo total = blocks_res + count_block_info(a, l + blocks * MIN_SEGMENT_SIZE, r, pivot);
 
     pfor(0, blocks, [&](int i) {
-        int begin = l + i * MIN_SEGMENT_SIZE;
-        int end = begin + MIN_SEGMENT_SIZE;
-        BlockInfo prefix = tmp[tmp_begin + i];
-        int less = l + prefix.less;
-        int equals = equal_begin + prefix.equal;
-        int greater = greater_begin + ((begin - l) - prefix.less - prefix.equal);
-
-        for (int j = begin; j < end; ++j) {
-            int value = a[j];
-            if (value == pivot) {
-                buff[equals++] = value;
-            } else {
-                int is_less = value < pivot;
-                int index = is_less ? less : greater;
-                buff[index] = value;
-                less += is_less;
-                greater += 1 - is_less;
-            }
-        }
+        write_block(a, buff, l, r, pivot, tmp[tmp_begin + i], total, i);
     });
 
-    int less = l + full_total.less;
-    int equals = equal_begin + full_total.equal;
-    int greater = greater_begin + ((tail_begin - l) - full_total.less - full_total.equal);
-    for (int i = tail_begin; i < r; ++i) {
-        int value = a[i];
-        if (value == pivot) {
-            buff[equals++] = value;
-        } else {
-            int is_less = value < pivot;
-            int index = is_less ? less : greater;
-            buff[index] = value;
-            less += is_less;
-            greater += 1 - is_less;
-        }
-    }
+    write_block(a, buff, l, r, pivot, blocks_res, total, blocks);
 
-    pfor(l, tail_begin, [&](int i) { a[i] = buff[i]; });
-    for (int i = tail_begin; i < r; ++i) {
-        a[i] = buff[i];
-    }
+    pfor(l, r, [&](int i) { 
+        a[i] = buff[i]; 
+    });
     return total;
 }
 
@@ -81,11 +76,18 @@ void quick_sort_par(std::vector<int>& a, std::vector<BlockInfo>& tmp, std::vecto
         return;
     }
 
-    int pivot = a[l + (r - l) / 2];
+    int pivot = a[(r + l) / 2];
     BlockInfo totals = partition_blocks(a, tmp, buff, l, r, pivot);
 
     parlay::par_do(
         [&] { quick_sort_par(a, tmp, buff, l, l + totals.less); },
         [&] { quick_sort_par(a, tmp, buff, l + totals.less + totals.equal, r); }
     );
+}
+
+void quick_sort_par(std::vector<int>&a) {
+    int size = static_cast<int>(a.size());
+    std::vector<BlockInfo> tmp(a.size() / MIN_SEGMENT_SIZE);
+    std::vector<int> buff(a.size());
+    quick_sort_par(a, tmp, buff, 0, a.size());
 }

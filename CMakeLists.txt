@@ -16,4 +16,5 @@ FetchContent_MakeAvailable(ParlayLib)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>")
 
+include(CTest)
 add_subdirectory(app)

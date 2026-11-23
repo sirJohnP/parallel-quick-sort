@@ -11,7 +11,4 @@ struct BlockInfo {
     }
 };
 
-BlockInfo partition_blocks(std::vector<int>& a, std::vector<BlockInfo>& tmp,
-                           std::vector<int>& buff, int l, int r, int pivot);
-
-void quick_sort_par(std::vector<int>& a, std::vector<BlockInfo>& tmp, std::vector<int>& buff, int l, int r);
+void quick_sort_par(std::vector<int>& a);
