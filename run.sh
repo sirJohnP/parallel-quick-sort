@@ -7,7 +7,7 @@ cmake --build "out" --config Release --parallel
 
 bin_dir="out/bin/Release"
 results_dir=$(mktemp -d "out/quick-sort-results.XXXXXX")
-trap 'rm -rf -- "$results_dir"' EXIT
+
 
 for i in 0 1 2 3 4; do
     "$bin_dir/quick_sort" seq >> "$results_dir/seq"
