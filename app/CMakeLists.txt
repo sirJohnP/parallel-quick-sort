@@ -1,0 +1,11 @@
+add_library(quick_sort_seq_lib STATIC)
+target_compile_features(quick_sort_seq_lib PUBLIC cxx_std_17)
+target_include_directories(quick_sort_seq_lib PUBLIC include)
+
+add_executable(quick_sort_seq)
+target_link_libraries(quick_sort_seq PRIVATE quick_sort_seq_lib)
+
+add_executable(quick_sort_par)
+target_link_libraries(quick_sort_par PRIVATE parlay quick_sort_seq_lib)
+
+add_subdirectory(src)
